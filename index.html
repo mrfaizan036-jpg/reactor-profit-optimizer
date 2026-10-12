@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reactor Profit Optimizer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#EEF3F5;--panel:#FFFFFF;--ink:#13293D;--mute:#5B6F80;--line:#D3DDE3;--acc:#0B7A85;--acc2:#E09F1F;--bad:#C4402C;--ok:#1F8A58;--c3:#7A4FB5;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0E1A24;--panel:#162634;--ink:#E4EDF3;--mute:#93A8B8;--line:#27394A;--acc:#3FC1CC;--acc2:#F0B94A;--bad:#F07A66;--ok:#4CC58A;--c3:#B590EA}}
+:root[data-theme="dark"]{--bg:#0E1A24;--panel:#162634;--ink:#E4EDF3;--mute:#93A8B8;--line:#27394A;--acc:#3FC1CC;--acc2:#F0B94A;--bad:#F07A66;--ok:#4CC58A;--c3:#B590EA}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;font-variant-numeric:tabular-nums}
+header{padding:28px 20px 8px;max-width:1200px;margin:0 auto}
+h1{margin:0 0 6px;font-size:clamp(1.9rem,5vw,3rem);font-weight:800;letter-spacing:-.02em;line-height:1.05}
+header p{margin:0;max-width:62ch;color:var(--mute)}
+.wrap{max-width:1200px;margin:0 auto;padding:16px 20px 40px;display:grid;grid-template-columns:330px 1fr;gap:20px;align-items:start}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+fieldset{border:0;margin:0 0 14px;padding:0}
+legend{font-weight:600;font-size:1.05rem;padding:0;margin-bottom:6px}
+.row{margin:8px 0}
+.row label{display:flex;justify-content:space-between;font-size:.9rem;color:var(--mute)}
+.row output{color:var(--ink);font-weight:600}
+input[type=range]{width:100%;accent-color:var(--acc);margin:2px 0}
+button{font:inherit;font-weight:600;border-radius:8px;padding:11px 14px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+button.go{background:var(--acc);color:#fff;border-color:var(--acc);width:100%;font-size:1.05rem}
+:root[data-theme="dark"] button.go{color:#08222A}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) button.go{color:#08222A}}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc2);outline-offset:2px}
+.btns{display:flex;gap:8px;margin-bottom:16px}.btns .go{flex:2}.btns .alt{flex:1}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+@media(max-width:600px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi small{color:var(--mute);display:block}
+.kpi b{font-size:1.6rem;font-weight:800;letter-spacing:-.02em}
+.kpi.main{border-color:var(--acc);border-width:2px}
+.msg{padding:12px 14px;border-radius:10px;margin-bottom:16px;background:var(--panel);border:1px solid var(--line);min-height:48px}
+.msg.good{border-color:var(--ok)}.msg.warn{border-color:var(--bad)}
+h2{font-size:1.05rem;margin:0 0 2px}
+.cap{margin:0 0 8px;color:var(--mute);font-size:.88rem}
+canvas{width:100%;height:250px;display:block}
+.charts{display:grid;gap:16px;margin-bottom:16px}
+.cons{list-style:none;margin:0;padding:0}
+.cons li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.cons li:first-child{border-top:0}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.note{color:var(--mute);font-size:.85rem;margin-top:14px;max-width:80ch}
+.theme{float:right;padding:6px 10px;font-size:.85rem}
+</style>
+</head>
+<body>
+<header>
+  <button class="theme" id="theme" aria-label="Toggle light and dark theme">Theme</button>
+  <h1>Reactor Profit Optimizer</h1>
+  <p>Find the temperature, reactor volume and feed rate that earn the most per hour in a stirred-tank reactor making product B from feed A, while keeping conversion and waste within limits.</p>
+</header>
+
+<div class="wrap">
+  <aside class="panel" id="controls">
+    <div class="btns">
+      <button class="go" id="opt">Find best settings</button>
+      <button class="alt" id="reset">Reset</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="kpis">
+      <div class="kpi main"><small>Profit</small><b id="kProfit">–</b></div>
+      <div class="kpi"><small>B yield</small><b id="kY">–</b></div>
+      <div class="kpi"><small>A conversion</small><b id="kX">–</b></div>
+      <div class="kpi"><small>Residence time</small><b id="kTau">–</b></div>
+    </div>
+    <div class="msg" id="msg" role="status">Move the sliders to explore, or press <b>Find best settings</b> to let the optimizer search.</div>
+
+    <div class="charts">
+      <section class="panel">
+        <h2>Profit vs temperature</h2>
+        <p class="cap">Using your current volume and feed rate. Red sections break a limit.</p>
+        <canvas id="c1" role="img" aria-label="Profit versus reactor temperature"></canvas>
+      </section>
+      <section class="panel">
+        <h2>Composition vs residence time</h2>
+        <p class="cap">At your current temperature. B peaks, then turns into waste C.</p>
+        <canvas id="c2" role="img" aria-label="Fractions of A, B and C versus residence time"></canvas>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Limits</h2>
+      <ul class="cons" id="cons"></ul>
+      <p class="note">Model: A → B → C, both first-order and irreversible, in an isothermal CSTR with feed concentration 2 kmol/m³. Rate constants follow Arrhenius laws (k₂ rises faster with temperature, so hotter means more waste). Profit = B sales − feed cost − C disposal − heating − reactor cost. The optimizer runs Nelder–Mead from many random starts with a penalty for broken limits.</p>
+    </section>
+  </main>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const CTRL=[
+ ['Operating point',[
+  ['T','Reactor temperature','K',300,420,0.5,340,1],
+  ['V','Reactor volume','m³',1,100,0.5,40,1],
+  ['F','Feed rate','m³/h',1,20,0.1,8,1]]],
+ ['Economics',[
+  ['pA','Feed A price','$/kmol',10,100,1,40,0],
+  ['pB','Product B price','$/kmol',50,200,1,95,0],
+  ['dC','Waste C disposal','$/kmol',0,50,1,10,0],
+  ['pE','Heating cost','$/GJ',0,60,1,15,0],
+  ['cV','Reactor cost','$/m³·h',0,10,0.5,4,1]]],
+ ['Limits',[
+  ['Tmax','Max temperature','K',320,420,1,380,0],
+  ['Xmin','Min A conversion','%',0,99,1,70,0],
+  ['Cmax','Max waste C yield','%',5,60,1,25,0]]]
+];
+const P={},META={};
+const box=$('controls');
+CTRL.forEach(([g,items])=>{
+  const fs=document.createElement('fieldset');
+  fs.innerHTML='<legend>'+g+'</legend>';
+  items.forEach(([id,name,u,min,max,step,val,d])=>{
+    P[id]=val;META[id]={min,max,step,val,d,u};
+    const r=document.createElement('div');r.className='row';
+    r.innerHTML='<label for="s_'+id+'">'+name+' <output id="o_'+id+'"></output></label><input type="range" id="s_'+id+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+val+'">';
+    fs.appendChild(r);
+    r.querySelector('input').addEventListener('input',e=>{P[id]=+e.target.value;$('msg').className='msg';render();});
+  });
+  box.appendChild(fs);
+});
+function sync(){for(const id in P){$('s_'+id).value=P[id];$('o_'+id).textContent=(+P[id]).toFixed(META[id].d)+' '+META[id].u;}}
+
+// ---- process model ----
+function model(T,V,F){
+  const k1=8.5e9*Math.exp(-8000/T),k2=9e12*Math.exp(-11000/T),tau=V/F;
+  const a=k1*tau,b=k2*tau;
+  const CA=1/(1+a),CB=a/((1+a)*(1+b)),CC=Math.max(0,1-CA-CB),X=1-CA;
+  const n=F*2; // kmol/h of A fed
+  const parts={sales:n*CB*P.pB,feed:n*P.pA,waste:n*CC*P.dC,heat:F*(T-298)*0.004*P.pE,reactor:P.cV*V};
+  const profit=parts.sales-parts.feed-parts.waste-parts.heat-parts.reactor;
+  const vX=Math.max(0,P.Xmin/100-X),vC=Math.max(0,CC-P.Cmax/100),vT=Math.max(0,T-P.Tmax);
+  return {tau,CA,CB,CC,X,profit,viol:vX+vC+vT/20,vX,vC,vT};
+}
+
+// ---- optimizer: multi-start Nelder-Mead with penalty ----
+function optimize(){
+  const lo=[META.T.min,META.V.min,META.F.min],hi=[Math.min(META.T.max,P.Tmax),META.V.max,META.F.max];
+  const clamp=x=>x.map((v,i)=>Math.min(hi[i],Math.max(lo[i],v)));
+  const f=x=>{const c=clamp(x),m=model(c[0],c[1],c[2]);return -m.profit+20000*m.viol;};
+  function nm(x0){
+    let S=[x0];for(let i=0;i<3;i++){const p=x0.slice();p[i]+=0.15*(hi[i]-lo[i])*(p[i]>(lo[i]+hi[i])/2?-1:1);S.push(p);}
+    S=S.map(clamp);let fv=S.map(f);
+    for(let it=0;it<250;it++){
+      const idx=[0,1,2,3].sort((a,b)=>fv[a]-fv[b]);S=idx.map(i=>S[i]);fv=idx.map(i=>fv[i]);
+      const c=[0,1,2].map(j=>(S[0][j]+S[1][j]+S[2][j])/3);
+      const mv=(t)=>clamp(c.map((v,j)=>v+t*(S[3][j]-v)));
+      const xr=mv(-1),fr=f(xr);
+      if(fr<fv[0]){const xe=mv(-2),fe=f(xe);if(fe<fr){S[3]=xe;fv[3]=fe;}else{S[3]=xr;fv[3]=fr;}}
+      else if(fr<fv[2]){S[3]=xr;fv[3]=fr;}
+      else{const xc=mv(0.5),fc=f(xc);
+        if(fc<fv[3]){S[3]=xc;fv[3]=fc;}
+        else for(let i=1;i<4;i++){S[i]=clamp(S[i].map((v,j)=>S[0][j]+0.5*(v-S[0][j])));fv[i]=f(S[i]);}}
+    }
+    const b=fv.indexOf(Math.min(...fv));return {x:S[b],f:fv[b]};
+  }
+  let best={f:Infinity};
+  const starts=[[P.T,P.V,P.F]];
+  for(let i=0;i<30;i++)starts.push(lo.map((l,j)=>l+Math.random()*(hi[j]-l)));
+  starts.forEach(s=>{const r=nm(s);if(r.f<best.f)best=r;});
+  return best.x;
+}
+$('opt').onclick=()=>{
+  const x=optimize(),r=(v,s)=>Math.round(v/s)*s;
+  P.T=r(x[0],0.5);P.V=r(x[1],0.5);P.F=r(x[2],0.1);
+  sync();render();
+  const m=model(P.T,P.V,P.F),el=$('msg');
+  if(m.viol>1e-3){el.className='msg warn';el.innerHTML='<b>No setting meets every limit.</b> Relax the minimum conversion or the waste limit, or allow a higher temperature.';}
+  else{el.className='msg good';el.innerHTML='<b>Best settings found:</b> '+P.T.toFixed(1)+' K, '+P.V.toFixed(1)+' m³, '+P.F.toFixed(1)+' m³/h, earning <b>$'+Math.round(m.profit).toLocaleString()+'/h</b>.';}
+};
+$('reset').onclick=()=>{for(const id in META)P[id]=META[id].val;$('msg').className='msg';$('msg').innerHTML='Settings reset. Move the sliders or press <b>Find best settings</b>.';sync();render();};
+$('theme').onclick=()=>{const d=document.documentElement,dark=getComputedStyle(d).getPropertyValue('--bg').trim()==='#0E1A24';d.dataset.theme=dark?'light':'dark';render();};
+
+// ---- charts ----
+const col=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function plot(cv,xs,ys,o){
+  const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;const g=cv.getContext('2d');g.scale(dpr,dpr);
+  const m={l:52,r:14,t:12,b:34},pw=W-m.l-m.r,ph=H-m.t-m.b;
+  const xmin=xs[0],xmax=xs[xs.length-1];
+  let all=[].concat(...ys.map(s=>s.v)),ymin=o.ymin!=null?o.ymin:Math.min(...all),ymax=o.ymax!=null?o.ymax:Math.max(...all);
+  if(ymax===ymin)ymax=ymin+1;
+  const X=v=>m.l+(v-xmin)/(xmax-xmin)*pw,Y=v=>m.t+ph-(v-ymin)/(ymax-ymin)*ph;
+  g.font='12px "Bricolage Grotesque",system-ui,sans-serif';g.fillStyle=col('--mute');g.strokeStyle=col('--line');g.lineWidth=1;
+  for(let i=0;i<=4;i++){const v=ymin+(ymax-ymin)*i/4,y=Y(v);g.beginPath();g.moveTo(m.l,y);g.lineTo(W-m.r,y);g.stroke();g.textAlign='right';g.fillText(o.yf(v),m.l-6,y+4);}
+  for(let i=0;i<=5;i++){const v=xmin+(xmax-xmin)*i/5;g.textAlign='center';g.fillText(v.toFixed(o.xd),X(v),H-m.b+16);}
+  g.fillText(o.xl,m.l+pw/2,H-4);
+  if(ymin<0&&ymax>0){g.strokeStyle=col('--mute');g.setLineDash([4,4]);g.beginPath();g.moveTo(m.l,Y(0));g.lineTo(W-m.r,Y(0));g.stroke();g.setLineDash([]);}
+  ys.forEach(s=>{g.lineWidth=2.5;for(let i=1;i<xs.length;i++){g.strokeStyle=s.seg?s.seg(i):s.c;g.beginPath();g.moveTo(X(xs[i-1]),Y(s.v[i-1]));g.lineTo(X(xs[i]),Y(s.v[i]));g.stroke();}});
+  if(o.mark!=null&&o.mark>=xmin&&o.mark<=xmax){g.strokeStyle=col('--acc2');g.lineWidth=2;g.setLineDash([5,4]);g.beginPath();g.moveTo(X(o.mark),m.t);g.lineTo(X(o.mark),m.t+ph);g.stroke();g.setLineDash([]);}
+  if(o.legend){let x=m.l+10;ys.forEach(s=>{g.fillStyle=s.c;g.fillRect(x,m.t+6,14,4);g.fillStyle=col('--ink');g.textAlign='left';g.fillText(s.n,x+19,m.t+12);x+=g.measureText(s.n).width+42;});}
+}
+function render(){
+  sync();
+  const m=model(P.T,P.V,P.F);
+  $('kProfit').textContent=(m.profit<0?'−':'')+'$'+Math.abs(Math.round(m.profit)).toLocaleString()+'/h';
+  $('kY').textContent=(m.CB*100).toFixed(1)+'%';
+  $('kX').textContent=(m.X*100).toFixed(1)+'%';
+  $('kTau').textContent=m.tau.toFixed(1)+' h';
+  const L=[['Temperature ≤ '+P.Tmax+' K',P.T.toFixed(1)+' K',m.vT===0],
+           ['A conversion ≥ '+P.Xmin+'%',(m.X*100).toFixed(1)+'%',m.vX===0],
+           ['Waste C yield ≤ '+P.Cmax+'%',(m.CC*100).toFixed(1)+'%',m.vC===0]];
+  $('cons').innerHTML=L.map(l=>'<li><span>'+l[0]+'</span><span class="'+(l[2]?'ok':'bad')+'">'+l[1]+' · '+(l[2]?'Met':'Violated')+'</span></li>').join('');
+  // chart 1
+  const Ts=[],Pv=[],bad=[];for(let T=300;T<=420.01;T+=1.5){Ts.push(T);const r=model(T,P.V,P.F);Pv.push(r.profit);bad.push(r.viol>0);}
+  plot($('c1'),Ts,[{v:Pv,c:col('--acc'),seg:i=>(bad[i]||bad[i-1])?col('--bad'):col('--acc')}],{yf:v=>'$'+Math.round(v),xd:0,xl:'Temperature (K)',mark:P.T});
+  // chart 2
+  const tmax=40,ts=[],A=[],B=[],C=[];for(let i=0;i<=120;i++){const t=tmax*i/120;ts.push(t);const k1=8.5e9*Math.exp(-8000/P.T),k2=9e12*Math.exp(-11000/P.T),a=k1*t,b=k2*t;const ca=1/(1+a),cb=a/((1+a)*(1+b));A.push(ca);B.push(cb);C.push(Math.max(0,1-ca-cb));}
+  plot($('c2'),ts,[{v:A,c:col('--mute'),n:'A'},{v:B,c:col('--acc'),n:'B (product)'},{v:C,c:col('--c3'),n:'C (waste)'}],{yf:v=>Math.round(v*100)+'%',xd:0,xl:'Residence time (h)',ymin:0,ymax:1,mark:m.tau,legend:true});
+}
+addEventListener('resize',render);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
+render();
+</script>
+</body>
+</html>
